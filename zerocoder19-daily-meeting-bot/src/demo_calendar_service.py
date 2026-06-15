@@ -76,4 +76,6 @@ class DemoCalendarService:
             "description": event.get("description", ""),
             "location": event.get("location", ""),
             "attendees": event.get("attendees", []),
+            "source_calendar_id": "demo",
+            "source_calendar_name": "Demo calendar",
         }

@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta
+import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Dict, List, Optional, Protocol, Tuple
 from zoneinfo import ZoneInfo
 
 from .zoom_parser import extract_zoom_links
 
 
 SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
+MAX_RESULTS = 50
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CREDENTIALS_FILE = PROJECT_ROOT / "credentials.json"
 DEFAULT_TOKEN_FILE = PROJECT_ROOT / "token.json"
@@ -18,6 +20,7 @@ GOOGLE_CALENDAR_NOT_CONFIGURED_MESSAGE = (
     "Google Calendar пока не подключён. Включите USE_DEMO_MODE=true "
     "или настройте credentials.json."
 )
+LOGGER = logging.getLogger(__name__)
 CREDENTIALS_NOT_FOUND_MESSAGE = (
     "credentials.json не найден в корне проекта. Скачайте OAuth Client ID "
     "типа Desktop app из Google Cloud Console и положите файл в корень проекта."
@@ -44,12 +47,17 @@ class GoogleCalendarService:
 
     def __init__(
         self,
-        calendar_id: str,
+        calendar_ids: List[str],
         timezone: str,
         credentials_file: Path = DEFAULT_CREDENTIALS_FILE,
         token_file: Path = DEFAULT_TOKEN_FILE,
     ) -> None:
-        self.calendar_id = calendar_id
+        self.calendar_ids = [
+            calendar_id.strip()
+            for calendar_id in calendar_ids
+            if calendar_id.strip()
+        ] or ["primary"]
+        self.calendar_id = self.calendar_ids[0]
         self.timezone = timezone
         self.timezone_info = ZoneInfo(timezone)
         self.credentials_file = Path(credentials_file)
@@ -59,35 +67,75 @@ class GoogleCalendarService:
     def get_events_for_date(self, target_date: date) -> List[Dict[str, Any]]:
         """Return normalized events that intersect the requested local day."""
         service = self._build_service()
+        calendar_names = self._get_calendar_name_map(service)
+        fetch_result = self._fetch_events_for_date(service, target_date)
+
+        events = [
+            self._normalize_event(
+                event,
+                calendar_id=calendar_id,
+                calendar_name=calendar_names.get(calendar_id, calendar_id),
+            )
+            for calendar_id, raw_events in fetch_result["events_by_calendar"].items()
+            for event in raw_events
+        ]
+        return sorted(events, key=lambda event: event.get("start", ""))
+
+    def get_day_bounds(self, target_date: date) -> Tuple[datetime, datetime]:
+        """Return local start/end datetimes for one calendar day."""
         day_start = datetime.combine(
             target_date,
             time.min,
             tzinfo=self.timezone_info,
         )
         day_end = day_start + timedelta(days=1)
+        return day_start, day_end
 
-        events: List[Dict[str, Any]] = []
+    def get_debug_info_for_date(self, target_date: date) -> Dict[str, Any]:
+        """Return Google Calendar query diagnostics for one local day."""
+        service = self._build_service()
+        day_start, day_end = self.get_day_bounds(target_date)
+        fetch_result = self._fetch_events_for_date(service, target_date)
+        events_by_calendar = fetch_result["events_by_calendar"]
+        calendar_errors = fetch_result["calendar_errors"]
+        event_count = sum(len(events) for events in events_by_calendar.values())
+
+        return {
+            "calendar_ids": self.calendar_ids,
+            "time_min": day_start.isoformat(),
+            "time_max": day_end.isoformat(),
+            "checked_calendar_count": len(self.calendar_ids),
+            "events_by_calendar": {
+                calendar_id: len(events)
+                for calendar_id, events in events_by_calendar.items()
+            },
+            "calendar_errors": calendar_errors,
+            "event_count": event_count,
+            "event_titles": [
+                event.get("summary") or "Без названия"
+                for events in events_by_calendar.values()
+                for event in events
+            ],
+        }
+
+    def list_calendars(self) -> List[Dict[str, Any]]:
+        """Return calendars available to the authorized Google account."""
+        service = self._build_service()
+        return self._list_calendars_with_service(service)
+
+    def _list_calendars_with_service(self, service: Any) -> List[Dict[str, Any]]:
+        """Return calendars using an already built Google Calendar service."""
+        calendars: List[Dict[str, Any]] = []
         page_token: Optional[str] = None
 
         try:
             while True:
                 response = (
-                    service.events()
-                    .list(
-                        calendarId=self.calendar_id,
-                        timeMin=day_start.isoformat(),
-                        timeMax=day_end.isoformat(),
-                        singleEvents=True,
-                        orderBy="startTime",
-                        timeZone=self.timezone,
-                        pageToken=page_token,
-                    )
+                    service.calendarList()
+                    .list(pageToken=page_token)
                     .execute()
                 )
-                events.extend(
-                    self._normalize_event(event)
-                    for event in response.get("items", [])
-                )
+                calendars.extend(response.get("items", []))
                 page_token = response.get("nextPageToken")
                 if not page_token:
                     break
@@ -95,11 +143,118 @@ class GoogleCalendarService:
             raise
         except Exception as error:
             raise GoogleCalendarServiceError(
-                "Не удалось получить события из Google Calendar. "
-                "Проверьте доступ к календарю и настройки API."
+                "Не удалось получить список календарей Google Calendar. "
+                "Проверьте доступ к аккаунту и настройки API."
             ) from error
 
-        return events
+        LOGGER.info("Google Calendar API returned %s calendars", len(calendars))
+        for calendar in calendars:
+            LOGGER.info(
+                "Google Calendar list item: summary=%s id=%s primary=%s accessRole=%s",
+                calendar.get("summary", ""),
+                calendar.get("id", ""),
+                calendar.get("primary", False),
+                calendar.get("accessRole", ""),
+            )
+
+        return calendars
+
+    def _fetch_events_for_date(
+        self,
+        service: Any,
+        target_date: date,
+    ) -> Dict[str, Any]:
+        day_start, day_end = self.get_day_bounds(target_date)
+        events_by_calendar: Dict[str, List[Dict[str, Any]]] = {}
+        calendar_errors: Dict[str, str] = {}
+
+        LOGGER.info("Google Calendar calendar_ids=%s", self.calendar_ids)
+        LOGGER.info("Google Calendar timeMin=%s", day_start.isoformat())
+        LOGGER.info("Google Calendar timeMax=%s", day_end.isoformat())
+
+        for calendar_id in self.calendar_ids:
+            raw_events: List[Dict[str, Any]] = []
+            page_token: Optional[str] = None
+            LOGGER.info("Reading Google Calendar calendar_id=%s", calendar_id)
+
+            try:
+                while True:
+                    response = (
+                        service.events()
+                        .list(
+                            calendarId=calendar_id,
+                            timeMin=day_start.isoformat(),
+                            timeMax=day_end.isoformat(),
+                            singleEvents=True,
+                            orderBy="startTime",
+                            maxResults=MAX_RESULTS,
+                            timeZone=self.timezone,
+                            pageToken=page_token,
+                        )
+                        .execute()
+                    )
+                    page_events = response.get("items", [])
+                    raw_events.extend(page_events)
+                    LOGGER.info(
+                        "Google Calendar API page returned %s events for calendar_id=%s",
+                        len(page_events),
+                        calendar_id,
+                    )
+                    page_token = response.get("nextPageToken")
+                    if not page_token:
+                        break
+            except GoogleCalendarNotConfiguredError:
+                raise
+            except Exception as error:
+                calendar_errors[calendar_id] = str(error)
+                LOGGER.exception(
+                    "Failed to read Google Calendar calendar_id=%s",
+                    calendar_id,
+                )
+
+            events_by_calendar[calendar_id] = raw_events
+            LOGGER.info(
+                "Google Calendar API returned %s events for calendar_id=%s",
+                len(raw_events),
+                calendar_id,
+            )
+            if len(raw_events) == 1:
+                LOGGER.info(
+                    "Only 1 event found for calendar_id=%s timeMin=%s timeMax=%s",
+                    calendar_id,
+                    day_start.isoformat(),
+                    day_end.isoformat(),
+                )
+
+            for event in raw_events:
+                LOGGER.info(
+                    "Google Calendar event title from calendar_id=%s: %s",
+                    calendar_id,
+                    event.get("summary") or "Без названия",
+                )
+
+        LOGGER.info(
+            "Google Calendar API returned %s events total",
+            sum(len(events) for events in events_by_calendar.values()),
+        )
+
+        return {
+            "events_by_calendar": events_by_calendar,
+            "calendar_errors": calendar_errors,
+        }
+
+    def _get_calendar_name_map(self, service: Any) -> Dict[str, str]:
+        try:
+            calendars = self._list_calendars_with_service(service)
+        except Exception:
+            LOGGER.exception("Failed to load Google Calendar names.")
+            return {}
+
+        return {
+            str(calendar.get("id")): str(calendar.get("summary") or calendar.get("id"))
+            for calendar in calendars
+            if calendar.get("id")
+        }
 
     def _build_service(self) -> Any:
         if not self.credentials_file.exists():
@@ -172,7 +327,12 @@ class GoogleCalendarService:
             cache_discovery=False,
         )
 
-    def _normalize_event(self, event: Dict[str, Any]) -> Dict[str, Any]:
+    def _normalize_event(
+        self,
+        event: Dict[str, Any],
+        calendar_id: str,
+        calendar_name: str,
+    ) -> Dict[str, Any]:
         description = str(event.get("description") or "")
         location = str(event.get("location") or "")
         hangout_link = str(event.get("hangoutLink") or "")
@@ -195,6 +355,8 @@ class GoogleCalendarService:
             "description": description,
             "location": location,
             "attendees": [],
+            "source_calendar_id": calendar_id,
+            "source_calendar_name": calendar_name or calendar_id,
         }
 
     def _conference_entry_point_uris(

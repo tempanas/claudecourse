@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from html import escape
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from .zoom_parser import extract_zoom_links
 
@@ -24,17 +24,29 @@ def _format_time(value: str) -> str:
 def format_events_message(
     events: List[Dict[str, Any]],
     date_label: str,
+    checked_calendar_count: Optional[int] = None,
 ) -> str:
     """Build an HTML-formatted Telegram message for a list of events."""
+    if checked_calendar_count is None:
+        checked_calendar_count = len(
+            {
+                str(event.get("source_calendar_id") or "demo")
+                for event in events
+            }
+        ) or 1
+
     if not events:
         return (
             f"📅 <b>{escape(date_label)}</b>\n\n"
+            "Найдено встреч: 0\n"
+            f"Проверено календарей: {checked_calendar_count}\n\n"
             "Встреч не найдено. Расписание свободно."
         )
 
     lines = [
         f"📅 <b>{escape(date_label)}</b>",
-        f"Всего встреч: {len(events)}",
+        f"Найдено встреч: {len(events)}",
+        f"Проверено календарей: {checked_calendar_count}",
     ]
 
     for index, event in enumerate(events, start=1):
@@ -49,6 +61,13 @@ def format_events_message(
                 f"🕒 {start_time} - {end_time}",
             ]
         )
+
+        source_calendar = (
+            event.get("source_calendar_name")
+            or event.get("source_calendar_id")
+            or "не указан"
+        )
+        lines.append(f"Календарь: {escape(str(source_calendar))}")
 
         attendees = event.get("attendees") or []
         if attendees:
