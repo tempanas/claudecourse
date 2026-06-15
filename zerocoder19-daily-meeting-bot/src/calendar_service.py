@@ -18,6 +18,10 @@ GOOGLE_CALENDAR_NOT_CONFIGURED_MESSAGE = (
     "Google Calendar пока не подключён. Включите USE_DEMO_MODE=true "
     "или настройте credentials.json."
 )
+CREDENTIALS_NOT_FOUND_MESSAGE = (
+    "credentials.json не найден в корне проекта. Скачайте OAuth Client ID "
+    "типа Desktop app из Google Cloud Console и положите файл в корень проекта."
+)
 
 
 class GoogleCalendarNotConfiguredError(RuntimeError):
@@ -50,6 +54,7 @@ class GoogleCalendarService:
         self.timezone_info = ZoneInfo(timezone)
         self.credentials_file = Path(credentials_file)
         self.token_file = Path(token_file)
+        print("Google Calendar mode enabled", flush=True)
 
     def get_events_for_date(self, target_date: date) -> List[Dict[str, Any]]:
         """Return normalized events that intersect the requested local day."""
@@ -97,6 +102,11 @@ class GoogleCalendarService:
         return events
 
     def _build_service(self) -> Any:
+        if not self.credentials_file.exists():
+            raise GoogleCalendarNotConfiguredError(CREDENTIALS_NOT_FOUND_MESSAGE)
+
+        print("credentials.json found", flush=True)
+
         try:
             from google.auth.transport.requests import Request
             from google.oauth2.credentials import Credentials
@@ -130,11 +140,10 @@ class GoogleCalendarService:
                     ) from error
             else:
                 if not self.credentials_file.exists():
-                    raise GoogleCalendarNotConfiguredError(
-                        GOOGLE_CALENDAR_NOT_CONFIGURED_MESSAGE
-                    )
+                    raise GoogleCalendarNotConfiguredError(CREDENTIALS_NOT_FOUND_MESSAGE)
 
                 try:
+                    print("Starting Google OAuth flow", flush=True)
                     flow = InstalledAppFlow.from_client_secrets_file(
                         str(self.credentials_file),
                         SCOPES,
@@ -150,6 +159,7 @@ class GoogleCalendarService:
                     credentials.to_json(),
                     encoding="utf-8",
                 )
+                print("token.json saved", flush=True)
             except OSError as error:
                 raise GoogleCalendarNotConfiguredError(
                     GOOGLE_CALENDAR_NOT_CONFIGURED_MESSAGE

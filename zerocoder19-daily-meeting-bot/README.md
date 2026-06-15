@@ -159,7 +159,7 @@ python3 -m src.bot
 Если `credentials.json` отсутствует или авторизация не настроена, бот ответит:
 
 ```text
-Google Calendar пока не подключён. Включите USE_DEMO_MODE=true или настройте credentials.json.
+credentials.json не найден в корне проекта. Скачайте OAuth Client ID типа Desktop app из Google Cloud Console и положите файл в корень проекта.
 ```
 
 Сервис запрашивает события между началом и концом выбранного дня в часовом
