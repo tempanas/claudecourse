@@ -1,63 +1,115 @@
 ---
 name: zerocoder19-calendar-bot
-description: Maintain and extend the Zerocoder19 Daily Meeting Bot repository. Use when an AI agent needs to inspect the project structure, run or test demo mode, add Telegram commands, implement Google Calendar access, update anonymized demo events, maintain documentation, or prepare the repository for safe publication.
+description: Помогает работать с проектом Zerocoder19 Daily Meeting Bot: запускать Telegram-бота, проверять команды, настраивать демо-режим, подключать Google Calendar, искать Zoom-ссылки в событиях и обновлять README. Использовать при доработке Telegram-бота для контроля встреч Зерокодер19.
 ---
 
 # Zerocoder19 Calendar Bot
 
-## Preserve the product contract
+## 1. Как устроен проект
 
-- Treat "Zerocoder19" as a job title, not a person's name.
-- Keep demo mode working without Google credentials.
-- Never add real names, phones, emails, Telegram tokens, or Zoom meetings.
-- Never send test messages to real work chats.
-- Keep `.env`, `credentials.json`, and `token.json` untracked.
+- `src/bot.py` - точка входа Telegram-бота, команды и выбор календарного
+  сервиса.
+- `src/config.py` - загрузка переменных из `.env`.
+- `src/demo_calendar_service.py` - демо-режим на `data/sample_events.json`.
+- `src/calendar_service.py` - Google Calendar API, OAuth и нормализация
+  событий.
+- `src/zoom_parser.py` - поиск Zoom-ссылок в тексте.
+- `src/formatter.py` - форматирование сообщений для Telegram.
+- `data/sample_events.json` - обезличенные демо-события.
+- `reports/` - отчёты, описание проекта и сценарий защиты.
+- `images/` - место для скриншотов без личных данных.
+- `README.md` - основная документация проекта.
 
-## Understand the structure
+## 2. Как запускать локально
 
-- Use `src/bot.py` for Telegram handlers and application wiring.
-- Use `src/config.py` for environment settings.
-- Keep calendar providers behind the interface in `src/calendar_service.py`.
-- Use `src/demo_calendar_service.py` and `data/sample_events.json` for demos.
-- Use `src/zoom_parser.py` only for Zoom URL extraction.
-- Use `src/formatter.py` for user-facing Telegram messages.
-- Update `README.md` and `reports/demo_result.md` when behavior changes.
+1. Создать окружение: `python3 -m venv .venv`.
+2. Активировать окружение: `source .venv/bin/activate`.
+3. Установить зависимости: `pip install -r requirements.txt`.
+4. Создать локальный `.env` из `.env.example`.
+5. Запускать из корня проекта: `python3 -m src.bot`.
+6. Проверять бота только в личном тестовом чате.
 
-## Run and verify
+Не отправлять тестовые сообщения в рабочие чаты.
 
-1. Create `.env` from `.env.example` and keep `USE_DEMO_MODE=true`.
-2. Install dependencies from `requirements.txt`.
-3. Run `python -m src.bot`.
-4. Test `/health`, `/demo`, `/today`, and `/tomorrow` in a private test chat.
-5. Run local module checks with `PYTHONPATH=src python -m compileall src`.
-6. Verify that events with Zoom show `Zoom: найден ✅`.
-7. Verify that events without Zoom show `Zoom: не найден ⚠️` and a calendar
-   check action.
+## 3. Как проверять демо-режим
 
-## Add a command
+1. В `.env` установить `USE_DEMO_MODE=true`.
+2. Убедиться, что `data/sample_events.json` содержит только обезличенные
+   данные.
+3. Запустить `python3 -m src.bot`.
+4. Проверить команды `/health`, `/demo`, `/today`, `/tomorrow`.
+5. Убедиться, что события с Zoom показывают `Zoom: найден ✅`.
+6. Убедиться, что события без Zoom показывают `Zoom: не найден ⚠️` и действие
+   `проверить событие в календаре`.
 
-1. Add an async handler in `src/bot.py`.
-2. Register it in `build_application`.
-3. Add it to `HELP_TEXT` and the README command table.
-4. Keep command output HTML-safe when using Telegram HTML parse mode.
-5. Test without contacting production chats.
+Не добавлять в демо реальные ФИО, email, телефоны или настоящие Zoom-ссылки.
 
-## Maintain Google Calendar
+## 4. Как проверять Google Calendar режим
 
-1. Keep Google OAuth and event normalization in `src/calendar_service.py`.
-2. Preserve the normalized event shape used by the demo provider.
-3. Query only the requested local day using the configured `TIMEZONE`.
-4. Read the calendar ID from `GOOGLE_CALENDAR_ID`.
-5. Search Zoom links in description, location, `hangoutLink`, and conference
-   entry points.
-6. Handle all-day events, missing fields, pagination, and API errors.
-7. Keep OAuth files local and ignored by Git.
-8. Retain demo mode as the default fallback and test surface.
+1. В `.env` установить `USE_DEMO_MODE=false`.
+2. Проверить, что `credentials.json` лежит в корне проекта.
+3. Проверить, что `credentials.json` не добавлен в Git.
+4. Запустить `python3 -m src.bot`.
+5. Выполнить `/today` или `/tomorrow` в личном тестовом чате.
+6. При первом запуске пройти OAuth-авторизацию в браузере.
+7. Убедиться, что после авторизации создан `token.json`.
+8. Проверить, что события приходят в формате, совместимом с
+   `src/formatter.py`.
 
-## Prepare publication
+Google Calendar режим должен читать календарь из `GOOGLE_CALENDAR_ID` и
+использовать часовой пояс из `TIMEZONE`.
 
-1. Review `git status` and staged changes.
-2. Search for tokens, credentials, personal data, and real meeting URLs.
-3. Confirm `.gitignore` protects all secret files.
-4. Run syntax and behavior checks.
-5. Ensure README setup steps match the current implementation.
+## 5. Какие файлы нельзя трогать и публиковать
+
+Нельзя публиковать, коммитить или вставлять в ответы:
+
+- `.env`;
+- `.env.local`;
+- `credentials.json`;
+- `token.json`;
+- реальные Telegram-токены;
+- реальные Zoom-ссылки;
+- реальные ФИО, телефоны и email.
+
+Не удалять файлы без отдельного запроса пользователя. Если файл выглядит
+секретным или пользовательским, сначала уточнить задачу.
+
+## 6. Как добавлять новые команды
+
+1. Добавить async handler в `src/bot.py`.
+2. Зарегистрировать команду через `CommandHandler` в `build_application`.
+3. Добавить команду в `HELP_TEXT`.
+4. Обновить таблицу команд в `README.md`.
+5. Если команда работает с календарём, использовать общий интерфейс сервиса и
+   не ломать демо-режим.
+6. Проверить команду в личном тестовом чате.
+
+Сохранять HTML-safe форматирование, потому что сообщения отправляются с
+`ParseMode.HTML`.
+
+## 7. Как обновлять README
+
+1. Синхронизировать README с реальным поведением кода.
+2. Обновлять команды, переменные окружения и инструкции запуска.
+3. Если меняется Google Calendar логика, обновить раздел подключения Calendar.
+4. Если меняются демо-данные или сценарии, обновить `reports/`.
+5. Не добавлять в README реальные токены, credentials, личные данные или
+   настоящие ссылки на встречи.
+
+README должен оставаться понятным для проверки финального проекта: что делает
+бот, как запустить, как показать демо и что нельзя публиковать.
+
+## 8. Как готовить проект к GitHub
+
+1. Проверить `.gitignore`: `.env`, `credentials.json`, `token.json`, `.venv/`,
+   `__pycache__/`.
+2. Выполнить проверку синтаксиса: `python3 -m compileall src`.
+3. Проверить демо-режим на `data/sample_events.json`.
+4. Найти потенциальные секреты поиском по токенам, credentials и реальным
+   ссылкам.
+5. Проверить, что в индекс Git не попали секретные файлы.
+6. Обновить README и отчёты перед финальным push.
+7. Коммитить только безопасные файлы проекта.
+
+Перед публикацией ещё раз убедиться, что нет реальных ФИО, Zoom-ссылок,
+Telegram-токенов, `credentials.json` и `token.json`.
