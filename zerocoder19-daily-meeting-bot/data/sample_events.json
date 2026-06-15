@@ -1,0 +1,52 @@
+[
+  {
+    "id": "demo_001",
+    "day_offset": 0,
+    "title": "Консультация тарифа Бизнес",
+    "start_time": "10:00",
+    "end_time": "10:45",
+    "description": "Консультация для student_001. Подключение: https://business-demo.zoom.us/j/000000001?pwd=demo_only",
+    "location": "Онлайн",
+    "attendees": ["student_001"]
+  },
+  {
+    "id": "demo_002",
+    "day_offset": 0,
+    "title": "Q&A по потоку",
+    "start_time": "13:00",
+    "end_time": "14:00",
+    "description": "Ответы на вопросы stream_demo. Комната: https://qa-demo.zoom.us/j/000000002?pwd=demo_only",
+    "location": "Онлайн",
+    "attendees": ["stream_demo"]
+  },
+  {
+    "id": "demo_003",
+    "day_offset": 0,
+    "title": "Проверка расписания встречи",
+    "start_time": "16:30",
+    "end_time": "17:00",
+    "description": "Событие создано без ссылки на видеоконференцию.",
+    "location": "Уточнить",
+    "attendees": ["student_001"]
+  },
+  {
+    "id": "demo_004",
+    "day_offset": 1,
+    "title": "Консультация с куратором",
+    "start_time": "11:00",
+    "end_time": "11:30",
+    "description": "Сверка статуса задач. Ссылка на подключение не добавлена.",
+    "location": "Онлайн",
+    "attendees": ["curator_a"]
+  },
+  {
+    "id": "demo_005",
+    "day_offset": 1,
+    "title": "Внутренняя встреча",
+    "start_time": "15:00",
+    "end_time": "15:45",
+    "description": "Внутренняя синхронизация. Zoom: http://internal-demo.zoom.us/j/000000003",
+    "location": "Онлайн",
+    "attendees": ["curator_a", "stream_demo"]
+  }
+]
