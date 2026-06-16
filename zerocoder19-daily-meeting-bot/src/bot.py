@@ -18,7 +18,7 @@ from .calendar_service import (
 )
 from .config import Settings, get_settings
 from .demo_calendar_service import DemoCalendarService
-from .formatter import format_events_message
+from .formatter import format_events_message, get_calendar_display_name
 
 
 logging.basicConfig(
@@ -260,16 +260,23 @@ def _get_calendar_debug_info(
 
 def _format_calendar_ids(calendar_ids: List[str]) -> str:
     return "\n".join(
-        f"- <code>{escape(str(calendar_id))}</code>"
+        f"- {_format_calendar_display_reference(str(calendar_id))}"
         for calendar_id in calendar_ids
     ) or "- нет календарей"
+
+
+def _format_calendar_display_reference(calendar_id: str) -> str:
+    display_name = get_calendar_display_name(calendar_id)
+    if display_name != calendar_id:
+        return f"{escape(display_name)} (<code>{escape(calendar_id)}</code>)"
+    return f"<code>{escape(calendar_id)}</code>"
 
 
 def _format_events_by_calendar(events_by_calendar: Dict[str, int]) -> str:
     if not events_by_calendar:
         return "Нет данных."
     return "\n".join(
-        f"- <code>{escape(str(calendar_id))}</code>: {count}"
+        f"- {_format_calendar_display_reference(str(calendar_id))}: {count}"
         for calendar_id, count in events_by_calendar.items()
     )
 
@@ -278,7 +285,7 @@ def _format_calendar_errors(calendar_errors: Dict[str, str]) -> str:
     if not calendar_errors:
         return "Ошибок нет."
     return "\n".join(
-        f"- <code>{escape(str(calendar_id))}</code>: {escape(str(error))}"
+        f"- {_format_calendar_display_reference(str(calendar_id))}: {escape(str(error))}"
         for calendar_id, error in calendar_errors.items()
     )
 

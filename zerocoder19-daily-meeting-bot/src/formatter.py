@@ -21,6 +21,13 @@ def _format_time(value: str) -> str:
         return "время не указано"
 
 
+def get_calendar_display_name(calendar_id: str) -> str:
+    """Return a user-facing calendar name without changing internal IDs."""
+    if calendar_id == "primary":
+        return "ZerocoderTeen"
+    return calendar_id
+
+
 def format_events_message(
     events: List[Dict[str, Any]],
     date_label: str,
@@ -67,6 +74,7 @@ def format_events_message(
             or event.get("source_calendar_id")
             or "не указан"
         )
+        source_calendar = get_calendar_display_name(str(source_calendar))
         lines.append(f"Календарь: {escape(str(source_calendar))}")
 
         attendees = event.get("attendees") or []
