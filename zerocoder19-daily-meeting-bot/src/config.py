@@ -2,12 +2,14 @@
 
 from dataclasses import dataclass
 import os
+from pathlib import Path
 from typing import List, Optional
 
 from dotenv import load_dotenv
 
 
-load_dotenv()
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+load_dotenv(PROJECT_ROOT / ".env")
 
 
 def _as_bool(value: Optional[str], default: bool = False) -> bool:
@@ -57,6 +59,8 @@ def _get_google_calendar_ids() -> List[str]:
 @dataclass(frozen=True)
 class Settings:
     telegram_bot_token: str
+    webhook_secret: str
+    pythonanywhere_username: str
     google_calendar_id: str
     google_calendar_ids: List[str]
     timezone: str
@@ -68,6 +72,8 @@ def get_settings() -> Settings:
     google_calendar_ids = _get_google_calendar_ids()
     return Settings(
         telegram_bot_token=os.getenv("TELEGRAM_BOT_TOKEN", ""),
+        webhook_secret=os.getenv("WEBHOOK_SECRET", ""),
+        pythonanywhere_username=os.getenv("PYTHONANYWHERE_USERNAME", ""),
         google_calendar_id=google_calendar_ids[0],
         google_calendar_ids=google_calendar_ids,
         timezone=os.getenv("TIMEZONE", "Europe/Minsk"),

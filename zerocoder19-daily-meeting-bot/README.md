@@ -85,12 +85,14 @@ zerocoder19-daily-meeting-bot/
 ├── reports/demo_result.md
 ├── reports/final-demo-script.md
 ├── reports/final-project-description.md
+├── deploy/PYTHONANYWHERE_DEPLOYMENT.md
 ├── src/__init__.py
 ├── src/bot.py
 ├── src/calendar_service.py
 ├── src/config.py
 ├── src/demo_calendar_service.py
 ├── src/formatter.py
+├── src/webhook_app.py
 ├── src/zoom_parser.py
 ├── .env.example
 ├── .gitignore
@@ -241,6 +243,53 @@ GOOGLE_CALENDAR_ID_5=
 2. `GOOGLE_CALENDAR_IDS=primary,calendar_id_2,calendar_id_3`;
 3. `GOOGLE_CALENDAR_ID=primary`;
 4. fallback `primary`.
+
+## Бесплатный деплой на PythonAnywhere через webhook
+
+Локально проект можно запускать через polling:
+
+```bash
+python3 -m src.bot
+```
+
+Для бесплатного деплоя на PythonAnywhere используется отдельное Flask webhook
+приложение:
+
+```text
+src/webhook_app.py
+```
+
+Почему webhook:
+
+- на PythonAnywhere Free не нужен постоянно работающий polling-процесс;
+- бот просыпается по команде Telegram;
+- Python остаётся основной технологией проекта;
+- банковская карта для Free account не нужна;
+- секреты хранятся только в `.env` на PythonAnywhere и не публикуются.
+
+Webhook принимает POST-запросы Telegram по секретному URL:
+
+```text
+https://<PYTHONANYWHERE_USERNAME>.pythonanywhere.com/<WEBHOOK_SECRET>
+```
+
+Поддерживаемые webhook-команды:
+
+- `/start`;
+- `/help`;
+- `/health`;
+- `/today`;
+- `/tomorrow`.
+
+Для `/today` и `/tomorrow` используется та же логика проекта:
+
+- `USE_DEMO_MODE=true` - события из `data/sample_events.json`;
+- `USE_DEMO_MODE=false` - события из Google Calendar;
+- Zoom-ссылки очищаются через `zoom_parser.py`;
+- длинные ответы делятся на части до 3900 символов.
+
+Подробная инструкция:
+[deploy/PYTHONANYWHERE_DEPLOYMENT.md](deploy/PYTHONANYWHERE_DEPLOYMENT.md).
 
 ## 13. Как создать Telegram-бота через BotFather
 
