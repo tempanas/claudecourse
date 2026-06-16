@@ -10,6 +10,10 @@ Telegram-бот для ежедневного контроля встреч из
 расписание на сегодня и завтра, ищет Zoom-ссылки в событиях и помечает встречи,
 которые нужно проверить вручную.
 
+## Ссылка на бота для проверки
+
+Telegram: [@Zerocoder_Daily_Meeting_Bot](https://t.me/Zerocoder_Daily_Meeting_Bot)
+
 > Зерокодер19 - название должности, а не имя человека.
 
 ## 3. Проблема
@@ -245,6 +249,9 @@ GOOGLE_CALENDAR_ID_5=
 4. fallback `primary`.
 
 ## Бесплатный деплой на PythonAnywhere через webhook
+
+Для доступа коллег добавлена webhook-версия на PythonAnywhere Free. Бот написан
+на Python и работает через Telegram webhook без постоянного polling-процесса.
 
 Локально проект можно запускать через polling:
 

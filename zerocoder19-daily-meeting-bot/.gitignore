@@ -1,5 +1,6 @@
 .env
 .env.local
+deploy/.env.pythonanywhere
 credentials.json
 token.json
 __pycache__/
